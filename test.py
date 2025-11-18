@@ -15,7 +15,11 @@ options.add_argument("--headless")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 
-driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+from selenium.webdriver.chrome.service import Service
+
+service = Service(ChromeDriverManager().install())
+driver = webdriver.Chrome(service=service, options=options)
+
 
 URL = "https://performancelab.my.id"
 
