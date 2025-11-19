@@ -1,0 +1,79 @@
+name: Check Sessions Bot
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # Daily at 9 AM UTC (adjust for your timezone, e.g., '0 2 * * *' for 2 AM UTC)
+  workflow_dispatch:  # Manual trigger from GitHub UI
+  repository_dispatch:  # Triggered by external events (e.g., Discord via YAGPDB/Zapier)
+    types: [discord_trigger]  # Matches the event type sent from your script or external tool
+
+jobs:
+  check_sessions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Cache Chrome and apt packages for faster runs
+      - name: Cache Chrome and apt packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt/archives/*.deb
+            /var/lib/apt/lists/*.gz
+            /var/lib/apt/lists/*_InRelease
+            /var/lib/apt/lists/*_Packages
+          key: ${{ runner.os }}-chrome-cache
+          restore-keys: |
+            ${{ runner.os }}-chrome-
+
+      # Install Chrome only if not already cached
+      - name: Install Chrome
+        run: |
+          if ! command -v google-chrome >/dev/null; then
+            echo "Chrome not found. Installing..."
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+            sudo apt-get update
+            sudo apt-get install -y google-chrome-stable
+          else
+            echo "Chrome found in cache. Skipping install."
+          fi
+
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # Cache Python dependencies
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium webdriver-manager requests
+
+      # Run the session check script
+      - name: Run session check script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # For dispatching events if needed
+          GYM_CODE: ${{ secrets.GYM_CODE }}
+          GYM_NAME: ${{ secrets.GYM_NAME }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: python check_sessions.py
+
+      # Upload debug files only on failure
+      - name: Upload debug files on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-files-check-sessions
+          path: debug/
