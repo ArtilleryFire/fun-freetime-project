@@ -2,11 +2,8 @@ name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "0 18 * * *"   # 01:00 WIB
+    - cron: "0 18 * * *"     # 01:00 WIB (18:00 UTC)
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   booking:
@@ -15,50 +12,45 @@ jobs:
     steps:
       # 1. Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # 2. Setup Python
+      # 2. Install Chrome + dependencies
+      - name: Install Chrome dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xvfb \
+            libnss3 \
+            libgconf-2-4 \
+            libxi6 \
+            libxcursor1 \
+            libxrandr2 \
+            libgtk-3-0 \
+            libasound2 \
+            libxss1 \
+            libxtst6 \
+            libcups2
+
+      - name: Install Google Chrome
+        run: |
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt --fix-broken install -y
+
+      # 3. Install Python + dependencies
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # 3. Install dependencies
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
-          pip install selenium webdriver-manager
+          pip install selenium webdriver-manager requests
 
-      # 4. Start Selenium Standalone Chrome
-      - name: Start Selenium Standalone Chrome
-        run: |
-          docker run -d --name selenium \
-            -p 4444:4444 \
-            --shm-size="2g" \
-            selenium/standalone-chrome:latest
-          sleep 10
-
-      # 5. Run main.py dengan log full ke console dan ke file
-      - name: Run booking script
+      # 4. Jalankan bot
+      - name: Run Booking Bot
         env:
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          echo "----- BOOKING LOG START -----" | tee booking_log.txt
-          python3 main.py 2>&1 | tee -a booking_log.txt
-          echo "----- BOOKING LOG END -----" | tee -a booking_log.txt
-
-      # 6. Upload log sebagai artifact
-      - name: Upload booking log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: booking-log
-          path: booking_log.txt
-
-      # 7. Shutdown Selenium
-      - name: Stop Selenium
-        if: always()
-        run: |
-          docker stop selenium
-          docker rm selenium
+          python3 main.py
