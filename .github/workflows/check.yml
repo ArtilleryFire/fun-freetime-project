@@ -23,7 +23,7 @@ jobs:
           /var/lib/apt/lists/*.gz
           /var/lib/apt/lists/*_InRelease
           /var/lib/apt/lists/*_Packages
-          key: ${{ runner.os }}-chrome-cache
+        key: ${{ runner.os }}-chrome-cache
         restore-keys: |
           ${{ runner.os }}-chrome-
 
