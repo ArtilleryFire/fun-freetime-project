@@ -1,12 +1,10 @@
 import os
 import time
-import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-
 from notify import send_log   # <<< DISCORD NOTIF
 
 URL = "https://performancelab.my.id"
@@ -14,16 +12,13 @@ URL = "https://performancelab.my.id"
 GYM_CODE = os.getenv("GYM_CODE")
 GYM_NAME = os.getenv("GYM_NAME")
 
-# Urutan sesi yang akan dicoba
 PREFERRED_SESSIONS = [6, 5, 4, 3, 2, 1]
-
 MAX_RUNTIME = 300          # 5 menit batas aman runner GA
-MAX_RETRY_LOOP = 5         # <<<<<< BATAS RETRY
-SLEEP_RETRY = 3            # jeda antara loop retry
+MAX_RETRY_LOOP = 5
+SLEEP_RETRY = 3            # jeda antar retry
 
 
 def log(msg):
-    """Print + kirim ke Discord"""
     full = f"[BOT] {msg}"
     print(full)
     try:
@@ -32,8 +27,6 @@ def log(msg):
         pass
 
 
-
-#  HEADLESS CHROME LOCAL
 def create_driver():
     options = Options()
     options.add_argument("--headless=new")
@@ -44,11 +37,10 @@ def create_driver():
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     return driver
-# ==============================
 
 
 def wait_css(driver, selector, timeout=30):
-    for i in range(timeout * 2):
+    for _ in range(timeout * 2):
         try:
             return driver.find_element(By.CSS_SELECTOR, selector)
         except:
@@ -99,25 +91,17 @@ def get_sessions(driver, max_retries=25):
 def try_booking(driver, session_id):
     try:
         slot = driver.find_element(
-            By.CSS_SELECTOR,
-            f".session-slot[data-session-id='{session_id}']"
+            By.CSS_SELECTOR, f".session-slot[data-session-id='{session_id}']"
         )
-
         classes = slot.get_attribute("class")
 
-        if "full" in classes:
-            log(f"Sesi {session_id} PENUH (class). Skip.")
+        if "full" in classes or "reserved-by-user" in classes or "unavailable-booked" in classes:
+            log(f"Sesi {session_id} tidak bisa dipesan (class: {classes}). Skip.")
             return False
 
         btn = slot.find_element(By.TAG_NAME, "button")
-
         if not btn.is_enabled():
             log(f"Sesi {session_id} disabled. Skip.")
-            return False
-
-        text = btn.text.strip().lower()
-        if "penuh" in text or "full" in text:
-            log(f"Sesi {session_id} PENUH (text). Skip.")
             return False
 
         btn.click()
@@ -137,7 +121,6 @@ def main():
     log("=== BOT BOOKING DIMULAI ===")
 
     driver = create_driver()
-
     login(driver)
     time.sleep(1)
     select_tomorrow(driver)
@@ -151,7 +134,6 @@ def main():
     log("Mulai proses booking...")
 
     while True:
-        # stop jika runtime > 5 menit
         if time.time() - start > MAX_RUNTIME:
             log("Stop karena runtime > 5 menit.")
             driver.quit()
