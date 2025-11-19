@@ -1,55 +1,37 @@
-name: Performance Lab Auto Booking
+name: Performance Lab Auto Book
 
 on:
   schedule:
-    - cron: "0 18 * * *"   # 01:00 WIB (18 UTC)
+    # 17:30 UTC = 00:30 WIB (besok pagi)
+    - cron: "30 17 * * *"
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   booking:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 1   # anti-error EACCES
 
-      # 2. Setup Python
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.10"
 
-      # 3. Install dependencies
       - name: Install dependencies
         run: |
-          pip install selenium
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      # 4. Start Selenium Standalone Chrome
-      - name: Start Selenium Grid (Chrome)
+      - name: Run Auto Booking
+        id: booking_step
         run: |
-          docker run -d --name selenium \
-            -p 4444:4444 \
-            --shm-size="2g" \
-            selenium/standalone-chrome:latest
-          sleep 10
+          echo "Running main.py ..."
+          python main.py > booking_log.txt 2>&1
+          echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
 
-      # 5. Jalankan Script
-      - name: Performance Lab Auto Book
-        env:
-          GYM_CODE: ${{ secrets.GYM_CODE }}
-          GYM_NAME: ${{ secrets.GYM_NAME }}
+      - name: Send Discord Notification
         run: |
-          python3 main.py
-
-      # 6. Shutdown Selenium
-      - name: Stop Selenium
-        if: always()
-        run: |
-          docker stop selenium
-          docker rm selenium
+          echo "Sending log to Discord ..."
+          python notify.py "${{ steps.booking_step.outputs.log_path }}"
