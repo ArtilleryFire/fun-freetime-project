@@ -1,17 +1,18 @@
 import os
 import time
+import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
 URL = "https://performancelab.my.id"
 
-# Ambil Secret dari GitHub Actions
 GYM_CODE = os.getenv("GYM_CODE")
 GYM_NAME = os.getenv("GYM_NAME")
 
-# Urutan sesi yang kamu inginkan (paling kanan = paling awal)
 PREFERRED_SESSIONS = [6, 5, 4, 3, 2, 1]
+
+MAX_RUNTIME = 300  # 5 menit batas aman agar GA tidak timeout
 
 
 def log(msg):
@@ -25,10 +26,20 @@ def create_driver():
     options.add_argument("--no-sandbox")
 
     driver = webdriver.Remote(
-        command_executor="http://localhost:4444/wd/hub",
+        command_executor=os.getenv("SELENIUM_URL", "http://localhost:4444/wd/hub"),
         options=options
     )
     return driver
+
+
+def wait_css(driver, selector, timeout=30):
+    for i in range(timeout * 2):
+        try:
+            elem = driver.find_element(By.CSS_SELECTOR, selector)
+            return elem
+        except:
+            time.sleep(0.5)
+    return None
 
 
 def login(driver):
@@ -36,115 +47,107 @@ def login(driver):
     driver.get(URL)
     time.sleep(2)
 
-    log("Mengisi kode dan nama...")
-    driver.find_element(By.ID, "kode").send_keys(GYM_CODE)
-    driver.find_element(By.ID, "nama").send_keys(GYM_NAME)
+    # Tunggu input tersedia
+    kode = wait_css(driver, "#kode")
+    nama = wait_css(driver, "#nama")
+
+    kode.send_keys(GYM_CODE)
+    nama.send_keys(GYM_NAME)
 
     driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
     time.sleep(3)
-
     log("Login selesai.")
 
 
 def select_tomorrow(driver):
-    log("Memilih hari BESOK...")
-    btn = driver.find_element(By.CSS_SELECTOR, ".date-btn[data-day='tomorrow']")
-    btn.click()
-    time.sleep(2)
+    btn = wait_css(driver, ".date-btn[data-day='tomorrow']", timeout=15)
+    if btn:
+        btn.click()
+        time.sleep(2)
+        return True
+    return False
 
 
-def get_sessions(driver, max_retries=20):
+def get_sessions(driver, max_retries=25):
     for attempt in range(max_retries):
-        try:
-            # Deteksi halaman error
-            if "500" in driver.page_source.lower() or "error" in driver.title.lower():
-                log(f"[ERROR] Server 500. Retry {attempt+1}/{max_retries}...")
-                time.sleep(2)
-                driver.refresh()
-                continue
-
-            sessions = driver.find_elements(By.CSS_SELECTOR, ".session-slot")
-
-            if len(sessions) == 0:
-                log(f"[WARNING] Sesi kosong. Retry {attempt+1}/{max_retries}...")
-                time.sleep(2)
-                driver.refresh()
-                continue
-
-            log(f"Berhasil menemukan {len(sessions)} sesi.")
+        sessions = driver.find_elements(By.CSS_SELECTOR, ".session-slot")
+        if len(sessions) > 0:
+            log(f"Menemukan {len(sessions)} sesi.")
             return sessions
 
-        except Exception as e:
-            log(f"[EXCEPTION] {e} | Retry {attempt+1}/{max_retries}")
-            time.sleep(2)
-            driver.refresh()
+        log(f"Sesi belum muncul (retry {attempt+1}/{max_retries})")
+        time.sleep(2)
+        driver.refresh()
+        select_tomorrow(driver)
 
-    log("[FATAL] Tidak bisa mengambil sesi.")
     return None
 
 
 def try_booking(driver, session_id):
     try:
         slot = driver.find_element(
-            By.CSS_SELECTOR, 
+            By.CSS_SELECTOR,
             f".session-slot[data-session-id='{session_id}']"
         )
 
-        # ========== CEK STATUS PENUH ==========  
         classes = slot.get_attribute("class")
 
+        # penuh
         if "full" in classes:
-            log(f"Sesi {session_id} PENUH (detected by class). Skip.")
+            log(f"Sesi {session_id} PENUH (class). Skip.")
             return False
 
-        # tombol
         btn = slot.find_element(By.TAG_NAME, "button")
 
         if not btn.is_enabled():
-            log(f"Sesi {session_id} TIDAK BISA DIPILIH (button disabled). Skip.")
+            log(f"Sesi {session_id} disabled. Skip.")
             return False
-        
+
         text = btn.text.strip().lower()
         if "penuh" in text or "full" in text:
-            log(f"Sesi {session_id} PENUH (detected by button text). Skip.")
+            log(f"Sesi {session_id} PENUH (text). Skip.")
             return False
 
-        # ========== JIKA AVAILABLE ==========  
+        # available
         btn.click()
         time.sleep(2)
-
-        log(f"=== BOOKING BERHASIL: SESI {session_id} ===")
+        log(f"=== BOOKING BERHASIL SESI {session_id} ===")
         return True
 
     except Exception as e:
-        log(f"Sesi {session_id} tidak ditemukan / error: {e}")
+        log(f"Error sesi {session_id}: {e}")
         return False
 
 
 def main():
+    start = time.time()
     driver = create_driver()
 
     login(driver)
+    time.sleep(1)
 
     select_tomorrow(driver)
 
-    log("Mengambil sesi...")
     sessions = get_sessions(driver)
-
     if sessions is None:
-        log("Gagal mengambil sesi. Stop.")
+        log("Gagal mengambil sesi (timeout).")
         driver.quit()
         return
 
-    log("Mulai mencoba booking...")
+    log("Mulai proses booking...")
 
     while True:
+        if time.time() - start > MAX_RUNTIME:
+            log("Stop karena runtime > 5 menit.")
+            driver.quit()
+            return
+
         for session_id in PREFERRED_SESSIONS:
             log(f"Mencoba sesi {session_id}...")
             if try_booking(driver, session_id):
                 driver.quit()
                 return
-        
+
         log("Belum dapat sesi, retry 3 detik...")
         time.sleep(3)
         driver.refresh()
