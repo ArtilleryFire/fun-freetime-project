@@ -181,6 +181,15 @@ def perform_booking(driver):
         driver.execute_script("arguments[0].scrollIntoView(true);", btn)
         btn.click()
         
+        # Handle the confirmation alert
+        try:
+            WebDriverWait(driver, 5).until(EC.alert_is_present())
+            alert = driver.switch_to.alert
+            logger.info(f"Accepting confirmation alert: {alert.text}")
+            alert.accept()  # Click "OK" to confirm
+        except Exception as e:
+            logger.warning(f"No alert found or failed to handle: {e}")
+        
         # Wait for potential confirmation (e.g., modal or page update)
         time.sleep(2)  # Short wait; adjust if needed
         debug_capture(driver, "07_after_click_session")
