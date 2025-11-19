@@ -102,22 +102,21 @@ def login(driver):
         membership_elem = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CLASS_NAME, "membership-status")))
         membership_text = membership_elem.text
         logger.info(f"Membership status: {membership_text}")
-        notify(f"ℹ Status Membership: {membership_text}")
+        notify(">> Scanning for reservation")
         
         # Check for expiry warning
         warning_elem = driver.find_element(By.ID, "membership-warning")
         if warning_elem.is_displayed():
             logger.warning("Membership has expired!")
-            notify("⚠ Masa aktif membership telah berakhir.")
+            notify(">> Membership has expired!")
             return False
         
         logger.info("Login and dashboard verification successful.")
-        notify("✅ Login berhasil.")
         return True
     except Exception as e:
         logger.error(f"Login failed: {e}")
         debug_capture(driver, "03_login_failed")
-        notify("❌ Login gagal. Periksa kode atau nama.")
+        notify(">> Unable to login")
         return False
 
 # =============================
@@ -148,7 +147,7 @@ def check_reservation(driver):
         reserved_slots = driver.find_elements(By.CSS_SELECTOR, ".session-slot.reserved-by-user")
         if not reserved_slots:
             logger.info(f"No reservations found for {date}.")
-            notify(f"ℹ Tidak ada reservasi untuk {date}.")
+            notify(f">> No reservation for {date}.")
             continue
         
         for slot in reserved_slots:
@@ -156,13 +155,13 @@ def check_reservation(driver):
             booking_code_elem = slot.find_element(By.CLASS_NAME, "booking-code")
             booking_code = booking_code_elem.text.replace("Kode: ", "").strip()
             logger.info(f"Reservation found for {date}: Session {session_id}, Kode: {booking_code}")
-            notify(f"📅 Reservasi ditemukan ({date}): Sesi {session_id} (Kode: {booking_code})")
+            notify(f">> Reservation found for {date}: Session {session_id} ({booking_code})")
 
 # =============================
 # MAIN
 # =============================
 def main():
-    notify("🔵 Pengecekan Reservasi dijalankan.")
+    notify("__*>> Checking for reservation <<*__.")
     
     driver = None
     try:
@@ -172,7 +171,6 @@ def main():
             return
         
         check_reservation(driver)
-        notify("✅ Pengecekan selesai.")
     
     except Exception as e:
         logger.error(f"Fatal error: {e}")
