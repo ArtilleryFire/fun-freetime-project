@@ -2,7 +2,7 @@ name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "0 18 * * *"   # 01:00 WIB
+    - cron: "0 18 * * *"
   workflow_dispatch:
 
 jobs:
@@ -13,37 +13,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install Chrome dependencies
+      - name: Install Chrome
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            xvfb \
-            libnss3 \
-            libxss1 \
-            libatk1.0-0 \
-            libatk-bridge2.0-0 \
-            libcups2 \
-            libxdamage1 \
-            libxrandr2 \
-            libgbm1 \
-            libgtk-3-0 \
-            libasound2t64
-
-      - name: Install Google Chrome
-        run: |
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt --fix-broken install -y
+          sudo apt-get install -y chromium-browser
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Install pip dependencies
+      - name: Install Python Dependencies
         run: |
           pip install selenium webdriver-manager requests
 
-      - name: Run bot
+      - name: Run Auto Booking
         env:
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
