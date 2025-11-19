@@ -2,7 +2,6 @@ name: Auto Booking Performance Lab
 
 on:
   schedule:
-    # 17:30 UTC = 00:30 WIB
     - cron: "30 17 * * *"
   workflow_dispatch:
 
@@ -12,7 +11,7 @@ jobs:
 
     services:
       selenium:
-        image: selenium/standalone-chrome:4.25.0   # <<< versi stabil
+        image: selenium/standalone-chromium:123.0
         ports:
           - 4444:4444
         options: >-
@@ -20,27 +19,26 @@ jobs:
 
     steps:
 
-      # 1. Checkout repo
-      - name: Checkout repository
+      - name: Debug Docker
+        run: docker ps -a
+
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2. Setup Python
-      - name: Setup Python 3.10
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # 3. Install dependencies
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Wait until Selenium is ready
       - name: Wait for Selenium
         run: |
           echo "[SYSTEM] Checking Selenium readiness..."
-          for i in {1..25}; do
+          for i in {1..30}; do
             STATUS=$(curl -s http://localhost:4444/wd/hub/status || echo "")
             if echo "$STATUS" | grep -q '"ready":true'; then
               echo "[SYSTEM] Selenium is ready!"
@@ -52,7 +50,6 @@ jobs:
           echo "[ERROR] Selenium did NOT start"
           exit 1
 
-      # 5. Run main.py + ensure log file always exists
       - name: Run Auto Booking
         id: booking_step
         run: |
@@ -60,15 +57,11 @@ jobs:
           python main.py >> booking_log.txt 2>&1 || true
           echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
 
-      # 6. Show log on GitHub Actions console
-      - name: Show Log
+      - name: Show log
         if: always()
         run: |
-          echo "------ BOOKING LOG START ------"
           cat booking_log.txt
-          echo "------ BOOKING LOG END ------"
 
-      # 7. Send to Discord
       - name: Send Discord Notification
         run: |
           python notify.py "${{ steps.booking_step.outputs.log_path }}"
