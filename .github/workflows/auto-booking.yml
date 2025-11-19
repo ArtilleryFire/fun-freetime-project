@@ -2,7 +2,7 @@ name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "0 18 * * *"     # 01:00 WIB (18:00 UTC)
+    - cron: "0 18 * * *"   # 01:00 WIB
   workflow_dispatch:
 
 jobs:
@@ -10,47 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Install Chrome + dependencies
+      # Install Chrome dependencies (Ubuntu 24.04 compatible)
       - name: Install Chrome dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             xvfb \
             libnss3 \
-            libgconf-2-4 \
-            libxi6 \
-            libxcursor1 \
-            libxrandr2 \
-            libgtk-3-0 \
-            libasound2 \
             libxss1 \
-            libxtst6 \
-            libcups2
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libxdamage1 \
+            libxrandr2 \
+            libgbm1 \
+            libgtk-3-0 \
+            libasound2t64
 
-      - name: Install Google Chrome
-        run: |
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt --fix-broken install -y
-
-      # 3. Install Python + dependencies
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Install Python dependencies
-        run: |
-          pip install selenium webdriver-manager requests
-
-      # 4. Jalankan bot
-      - name: Run Booking Bot
-        env:
-          GYM_CODE: ${{ secrets.GYM_CODE }}
-          GYM_NAME: ${{ secrets.GYM_NAME }}
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          python3 main.py
+      - name: Install Google Chro
