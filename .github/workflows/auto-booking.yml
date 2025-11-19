@@ -2,41 +2,45 @@ name: Performance Lab Bot
 
 on:
   schedule:
-    - cron: '0 19 * * *'   # Daily at 19:00 UTC
-  workflow_dispatch:        # Manual trigger from GitHub UI
+    - cron: '0 19 * * *'
+  workflow_dispatch:
 
 jobs:
   reserve:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------------
-      # CACHE CHROME + APT PACKAGES
-      # -------------------------------
+      # Shared cache for Chrome + apt packages
       - name: Cache Chrome and apt packages
         uses: actions/cache@v4
         with:
           path: |
             /var/cache/apt/archives/*.deb
             /var/lib/apt/lists/*
-          key: ${{ runner.os }}-chrome-${{ hashFiles('**/main.py') }}
+          key: ${{ runner.os }}-chrome-cache
           restore-keys: |
             ${{ runner.os }}-chrome-
 
-      # Install Chrome
+      # Install Chrome only if not found
       - name: Install Chrome
         run: |
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          if ! command -v google-chrome >/dev/null; then
+            echo "Chrome not found. Installing..."
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+            sudo apt-get update
+            sudo apt-get install -y google-chrome-stable
+          else
+            echo "Chrome found in cache. Skipping install."
+          fi
 
-      # -------------------------------
-      # CACHE PYTHON PIP DEPENDENCIES
-      # -------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
       - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
@@ -45,20 +49,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Setup Python
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install selenium webdriver-manager requests
 
-      # -------------------------------
-      # RUN RESERVATION SCRIPT
-      # -------------------------------
       - name: Run reservation script
         env:
           GYM_CODE: ${{ secrets.GYM_CODE }}
@@ -66,9 +61,6 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: python main.py
 
-      # -------------------------------
-      # UPLOAD DEBUG FILES ON FAILURE
-      # -------------------------------
       - name: Upload debug files on failure
         if: failure()
         uses: actions/upload-artifact@v4
