@@ -157,10 +157,6 @@ def perform_booking(driver):
         # Wait for available slots to appear (in case they're loaded dynamically)
         WebDriverWait(driver, TIMEOUT).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".session-slot")))
         slots = driver.find_elements(By.CSS_SELECTOR, ".session-slot.available")
-        if slots:
-            logger.warning("Session Available")
-            notify(">> Finding available session.")
-            return False
         if not slots:
             logger.warning("No available sessions found.")
             notify(">> No available sessions found")
@@ -178,6 +174,7 @@ def perform_booking(driver):
         # Pick the highest priority (first in sorted list)
         chosen_session_id, chosen_slot = available_sessions[0]
         logger.info(f"Selected session ID {chosen_session_id} for booking.")
+        notify(f">>Session found, booking session {chosen_session_id}...")
         debug_capture(driver, "06_found_available_slots")
         
         logger.info("Clicking selected session...")
