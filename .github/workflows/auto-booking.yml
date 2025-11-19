@@ -30,9 +30,7 @@ jobs:
         run: |
           pip install selenium
 
-      # ================================
       # 4. Start Selenium Standalone Chrome
-      # ================================
       - name: Start Selenium Grid (Chrome)
         run: |
           docker run -d --name selenium \
@@ -47,7 +45,7 @@ jobs:
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
         run: |
-          python3 auto_booking.py
+          python3 main.py
 
       # 6. Shutdown Selenium
       - name: Stop Selenium
