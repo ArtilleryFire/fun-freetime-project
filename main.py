@@ -1,6 +1,7 @@
 import os
 import logging
 import traceback
+import time  # Added this import to fix the 'time' not defined error
 import requests
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -97,7 +98,21 @@ def login(driver):
         WebDriverWait(driver, TIMEOUT).until(lambda d: "dashboard.php" in d.current_url)
         debug_capture(driver, "03_after_login_attempt")
         
-        logger.info("Login successful.")
+        # New: Check for membership status on dashboard
+        logger.info("Verifying dashboard and membership status...")
+        membership_elem = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CLASS_NAME, "membership-status")))
+        membership_text = membership_elem.text
+        logger.info(f"Membership status: {membership_text}")
+        notify(f"ℹ Status Membership: {membership_text}")
+        
+        # Check for expiry warning
+        warning_elem = driver.find_element(By.ID, "membership-warning")
+        if warning_elem.is_displayed():
+            logger.warning("Membership has expired!")
+            notify("⚠ Masa aktif membership telah berakhir. Tidak bisa booking.")
+            return False
+        
+        logger.info("Login and dashboard verification successful.")
         notify("✅ Login berhasil.")
         return True
     except Exception as e:
@@ -146,11 +161,23 @@ def perform_booking(driver):
             notify("⚠ Tidak ada sesi available untuk besok.")
             return False
         
-        first_slot = slots[0]
+        # Collect available sessions with their IDs
+        available_sessions = []
+        for slot in slots:
+            session_id = int(slot.get_attribute("data-session-id"))
+            available_sessions.append((session_id, slot))
+        
+        # Sort by session_id descending (6, 5, 4, 3, 2, 1)
+        available_sessions.sort(key=lambda x: x[0], reverse=True)
+        
+        # Pick the highest priority (first in sorted list)
+        chosen_session_id, chosen_slot = available_sessions[0]
+        logger.info(f"Selected session ID {chosen_session_id} for booking.")
+        
         debug_capture(driver, "06_found_available_slots")
         
-        logger.info("Clicking first available session...")
-        btn = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable(first_slot.find_element(By.TAG_NAME, "button")))
+        logger.info("Clicking selected session...")
+        btn = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable(chosen_slot.find_element(By.TAG_NAME, "button")))
         driver.execute_script("arguments[0].scrollIntoView(true);", btn)
         btn.click()
         
@@ -163,7 +190,7 @@ def perform_booking(driver):
         success_indicators = driver.find_elements(By.CSS_SELECTOR, ".success-message")  # Placeholder; replace with actual selector
         if success_indicators or "reserved" in driver.page_source.lower():
             logger.info("Booking successful.")
-            notify("🎉 Berhasil booking sesi gym!")
+            notify(f"🎉 Berhasil booking sesi gym! (Session {chosen_session_id})")
             return True
         else:
             logger.warning("Booking may have failed; no success indicator found.")
