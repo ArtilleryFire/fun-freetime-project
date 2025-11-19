@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: ["Performance Lab Bot"]
     types: [completed]
+  workflow_dispatch:
   schedule:
     - cron: '0 8 * * *'
 
