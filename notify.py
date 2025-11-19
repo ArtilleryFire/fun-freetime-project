@@ -3,31 +3,14 @@ import requests
 
 WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 
-def send_log(message: str):
-    """Kirim pesan teks ke Discord."""
+def send_log(message):
+    """Kirim pesan ke Discord menggunakan Webhook."""
     if not WEBHOOK:
+        print("[WARN] DISCORD_WEBHOOK tidak ditemukan, skip notif.")
         return
 
     try:
-        requests.post(WEBHOOK, json={"content": message})
-    except Exception:
-        pass
-
-
-def send_embed(title: str, description: str, color: int = 0x00FFAA):
-    """Kirim embed Discord (opsional untuk notifikasi penting)."""
-    if not WEBHOOK:
-        return
-    
-    payload = {
-        "embeds": [{
-            "title": title,
-            "description": description,
-            "color": color
-        }]
-    }
-
-    try:
-        requests.post(WEBHOOK, json=payload)
-    except Exception:
-        pass
+        payload = {"content": message}
+        requests.post(WEBHOOK, json=payload, timeout=5)
+    except Exception as e:
+        print(f"[WARN] Gagal kirim Discord: {e}")
