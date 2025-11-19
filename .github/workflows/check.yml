@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 8 * * *'  # Daily at 8 AM UTC; adjust as needed (e.g., '0 1 * * *' for 1 AM UTC)
   workflow_run:
-    workflows: ["Gym Reservation Bot"]  # Trigger after the booking workflow finishes
+    workflows: ["Performance Lab Bot"]  # Trigger after the booking workflow finishes
     types:
       - completed
 
