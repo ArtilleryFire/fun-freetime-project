@@ -16,12 +16,14 @@ jobs:
       - name: Cache Chrome and apt packages
         uses: actions/cache@v4
         with:
-          path: |
-            /var/cache/apt/archives/*.deb
-            /var/lib/apt/lists/*
+        path: |
+          /var/cache/apt/archives/*.deb
+          /var/lib/apt/lists/*.gz
+          /var/lib/apt/lists/*_InRelease
+          /var/lib/apt/lists/*_Packages
           key: ${{ runner.os }}-chrome-cache
-          restore-keys: |
-            ${{ runner.os }}-chrome-
+        restore-keys: |
+          ${{ runner.os }}-chrome-
 
       # Install Chrome only if not found
       - name: Install Chrome
