@@ -1,4 +1,4 @@
-name: Auto Booking Gym
+name: Performance Lab Auto Booking
 
 on:
   schedule:
