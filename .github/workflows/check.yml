@@ -1,13 +1,11 @@
 name: Check Reservation Bot
 
 on:
-  schedule:
-    - cron: '0 8 * * *'  # Daily at 8 AM UTC; adjust as needed (e.g., '0 1 * * *' for 1 AM UTC)
-  workflow_dispatch:  # Manual trigger from GitHub UI
   workflow_run:
-    workflows: ["Performance Lab Bot"]  # Trigger after the booking workflow finishes
-    types:
-      - completed
+    workflows: ["Performance Lab Bot"]
+    types: [completed]
+  schedule:
+    - cron: '0 8 * * *'
 
 jobs:
   check:
@@ -16,17 +14,42 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Shared cache (same key as auto_book.yml)
+      - name: Cache Chrome and apt packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt/archives/*.deb
+            /var/lib/apt/lists/*
+          key: ${{ runner.os }}-chrome-cache
+          restore-keys: |
+            ${{ runner.os }}-chrome-
+
+      # Install Chrome only if missing
+      - name: Install Chrome
+        run: |
+          if ! command -v google-chrome >/dev/null; then
+            echo "Chrome not found. Installing..."
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+            sudo apt-get update
+            sudo apt-get install -y google-chrome-stable
+          else
+            echo "Chrome found in cache. Skipping install."
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      - name: Install Chrome
-        run: |
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install Python dependencies
         run: |
