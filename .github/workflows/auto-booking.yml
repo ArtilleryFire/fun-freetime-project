@@ -1,0 +1,57 @@
+name: Auto Booking Gym
+
+on:
+  schedule:
+    - cron: "0 18 * * *"   # 01:00 WIB (18 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  booking:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1   # anti-error EACCES
+
+      # 2. Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          pip install selenium
+
+      # ================================
+      # 4. Start Selenium Standalone Chrome
+      # ================================
+      - name: Start Selenium Grid (Chrome)
+        run: |
+          docker run -d --name selenium \
+            -p 4444:4444 \
+            --shm-size="2g" \
+            selenium/standalone-chrome:latest
+          sleep 10
+
+      # 5. Jalankan Script
+      - name: Performance Lab Auto Book
+        env:
+          GYM_CODE: ${{ secrets.GYM_CODE }}
+          GYM_NAME: ${{ secrets.GYM_NAME }}
+        run: |
+          python3 auto_booking.py
+
+      # 6. Shutdown Selenium
+      - name: Stop Selenium
+        if: always()
+        run: |
+          docker stop selenium
+          docker rm selenium
