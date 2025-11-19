@@ -103,7 +103,7 @@ def login(driver):
         membership_elem = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CLASS_NAME, "membership-status")))
         membership_text = membership_elem.text
         logger.info(f"Membership status: {membership_text}")
-        notify(f"ℹ Status Membership: {membership_text}")
+        notify(f"*{membership_text}*")
         
         # Check for expiry warning
         warning_elem = driver.find_element(By.ID, "membership-warning")
@@ -113,12 +113,12 @@ def login(driver):
             return False
         
         logger.info("Login and dashboard verification successful.")
-        notify("✅ Login berhasil.")
+        notify(">> Login Success")
         return True
     except Exception as e:
         logger.error(f"Login failed: {e}")
         debug_capture(driver, "03_login_failed")
-        notify("❌ Login gagal. Periksa kode atau nama.")
+        notify(">> Login Failed, Please Check")
         return False
 
 # =============================
@@ -133,13 +133,6 @@ def perform_booking(driver):
     
     debug_capture(driver, "04_dashboard_loaded")
     
-    # Check if already reserved (look for "reserved-by-user" class or similar)
-    reserved_slots = driver.find_elements(By.CSS_SELECTOR, ".session-slot.reserved-by-user")
-    if reserved_slots:
-        logger.info("Slot already reserved for tomorrow.")
-        notify("ℹ Slot sudah dipesan untuk besok.")
-        return True  # Consider this a success to avoid re-booking
-    
     logger.info("Clicking tomorrow tab...")
     try:
         tomorrow_btn = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".date-btn[data-day='tomorrow']")))
@@ -148,17 +141,29 @@ def perform_booking(driver):
         debug_capture(driver, "05_tomorrow_tab_clicked")
     except Exception as e:
         logger.error(f"Could not click tomorrow tab: {e}")
-        notify("❌ Tidak bisa klik tab Besok.")
+        notify(">> Could not click tomorrow tab")
         return False
-    
+        
+    # Check if already reserved (look for "reserved-by-user" class or similar)
+    reserved_slots = driver.find_elements(By.CSS_SELECTOR, ".session-slot.reserved-by-user")
+    if reserved_slots:
+        logger.info("Slot already reserved for tomorrow.")
+        notify(">> Slot already reserved for tomorrow")
+        return True  # Consider this a success to avoid re-booking
+        
     logger.info("Scanning available sessions...")
+    notify(">> Looking for sessions...")
     try:
         # Wait for available slots to appear (in case they're loaded dynamically)
         WebDriverWait(driver, TIMEOUT).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".session-slot")))
         slots = driver.find_elements(By.CSS_SELECTOR, ".session-slot.available")
+         if slots:
+            logger.warning("Session Available")
+            notify(">> Finding available session.")
+            return False
         if not slots:
             logger.warning("No available sessions found.")
-            notify("⚠ Tidak ada sesi available untuk besok.")
+            notify(">> No available sessions found")
             return False
         
         # Collect available sessions with their IDs
@@ -173,7 +178,6 @@ def perform_booking(driver):
         # Pick the highest priority (first in sorted list)
         chosen_session_id, chosen_slot = available_sessions[0]
         logger.info(f"Selected session ID {chosen_session_id} for booking.")
-        
         debug_capture(driver, "06_found_available_slots")
         
         logger.info("Clicking selected session...")
@@ -199,34 +203,35 @@ def perform_booking(driver):
         success_indicators = driver.find_elements(By.CSS_SELECTOR, ".success-message")  # Placeholder; replace with actual selector
         if success_indicators or "reserved" in driver.page_source.lower():
             logger.info("Booking successful.")
-            notify(f"🎉 Berhasil booking sesi gym! (Session {chosen_session_id})")
+            notify(f">> Booking successful for *session {chosen_session_id}*")
             return True
         else:
             logger.warning("Booking may have failed; no success indicator found.")
-            notify("⚠ Booking mungkin gagal; periksa manual.")
+            notify(">> Please check, booking may have failed")
             return False
     except Exception as e:
         logger.error(f"Unable to book session: {e}")
-        notify("❌ Gagal booking sesi.")
+        notify(">> Unable to book session")
         return False
 
 # =============================
 # MAIN
 # =============================
 def main():
-    notify("🔵 Auto Booking dijalankan.")
+    notify("__** Starting Process **__")
     
     driver = None
     try:
         driver = create_driver()
         if not login(driver):
             logger.error("Login failed, exiting.")
+            notify("Login failed, exiting program...")
             return
         
         if perform_booking(driver):
-            notify("✅ Booking selesai.")
+            notify(">> Reservation complete")
         else:
-            notify("⚠ Booking tidak berhasil.")
+            notify(">> Unable to reserve")
     
     except Exception as e:
         logger.error(f"Fatal error: {e}")
