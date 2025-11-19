@@ -30,4 +30,24 @@ jobs:
             libgtk-3-0 \
             libasound2t64
 
-      - name: Install Google Chro
+      - name: Install Google Chrome
+        run: |
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt --fix-broken install -y
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          pip install selenium webdriver-manager requests
+
+      - name: Run Booking Bot
+        env:
+          GYM_CODE: ${{ secrets.GYM_CODE }}
+          GYM_NAME: ${{ secrets.GYM_NAME }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          python3 main.py
