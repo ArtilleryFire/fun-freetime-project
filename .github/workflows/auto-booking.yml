@@ -2,13 +2,21 @@ name: Performance Lab Auto Book
 
 on:
   schedule:
-    # 17:30 UTC = 00:30 WIB (besok pagi)
+    # 17:30 UTC = 00:30 WIB
     - cron: "30 17 * * *"
   workflow_dispatch:
 
 jobs:
   booking:
     runs-on: ubuntu-latest
+
+    services:
+      selenium:
+        image: selenium/standalone-chrome:latest
+        ports:
+          - 4444:4444
+        options: >-
+          --shm-size="2g"
 
     steps:
       - name: Checkout repo
@@ -22,23 +30,31 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install selenium python-dotenv requests
 
       - name: Run Auto Booking
         id: booking_step
+        env:
+          SELENIUM_URL: http://selenium:4444/wd/hub
+          GYM_CODE: ${{ secrets.GYM_CODE }}
+          GYM_NAME: ${{ secrets.GYM_NAME }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           echo "Running main.py ..."
           python main.py > booking_log.txt 2>&1
           echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
-          
+
       - name: Show main.py output
-      if: always()
-      run: |
-        echo "------ BOOKING LOG START ------"
-        cat booking_log.txt || echo "No log file found!"
-        echo "------ BOOKING LOG END ------"
+        if: always()
+        run: |
+          echo "------ BOOKING LOG START ------"
+          cat booking_log.txt || echo "Log file not found!"
+          echo "------ BOOKING LOG END ------"
 
       - name: Send Discord Notification
+        if: always()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           echo "Sending log to Discord ..."
-          python notify.py "${{ steps.booking_step.outputs.log_path }}"
+          python notify.py booking_log.txt
