@@ -15,11 +15,11 @@ jobs:
     steps:
       # 1. Checkout repo
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # 2. Setup Python
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -43,14 +43,14 @@ jobs:
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
         run: |
-          echo "----- BOOKING LOG START -----" | tee booking_log.txt
-          python3 main.py 2>&1 | tee -a booking_log.txt
-          echo "----- BOOKING LOG END -----" | tee -a booking_log.txt
+          echo "----- BOOKING LOG START -----" | tee booking.log
+          python3 main.py 2>&1 | tee -a booking.log
+          echo "----- BOOKING LOG END -----" | tee -a booking.log
 
-      # 6. Upload log sebagai artifact
+      # 6. Upload log sebagai artifact (versi baru)
       - name: Upload booking log
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: booking-log
           path: booking.log
