@@ -2,8 +2,7 @@ name: Performance Lab Auto Book
 
 on:
   schedule:
-    # 17:30 UTC = 00:30 WIB
-    - cron: "30 17 * * *"
+    - cron: "30 17 * * *"  # 00:30 WIB
   workflow_dispatch:
 
 jobs:
@@ -32,23 +31,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install selenium python-dotenv requests
 
+      - name: Wait for Selenium to be ready
+        run: |
+          echo "Waiting selenium..."
+          for i in {1..20}; do
+            if curl -s http://localhost:4444/wd/hub/status | grep -q '"ready":true'; then
+              echo "Selenium Ready!"
+              exit 0
+            fi
+            echo "Retry $i..."
+            sleep 2
+          done
+          echo "Selenium failed to start" && exit 1
+
       - name: Run Auto Booking
         id: booking_step
         env:
-          SELENIUM_URL: http://selenium:4444/wd/hub
+          SELENIUM_URL: http://localhost:4444/wd/hub
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          echo "Running main.py ..."
-          python main.py > booking_log.txt 2>&1
+          echo "[BOT] Start booking" > booking_log.txt
+          python main.py >> booking_log.txt 2>&1
           echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
 
       - name: Show main.py output
         if: always()
         run: |
           echo "------ BOOKING LOG START ------"
-          cat booking_log.txt || echo "Log file not found!"
+          cat booking_log.txt || echo "Log not found!"
           echo "------ BOOKING LOG END ------"
 
       - name: Send Discord Notification
@@ -56,5 +68,4 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          echo "Sending log to Discord ..."
           python notify.py booking_log.txt
