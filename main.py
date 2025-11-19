@@ -29,9 +29,11 @@ def log(msg):
     except:
         pass
 
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
 
 def create_driver():
-    """Create Chrome headless driver (NOT Selenium Grid)."""
+    """Create Chrome headless driver (works in GitHub Actions)."""
     log("Menjalankan Chrome Headless lokal...")
 
     options = Options()
@@ -41,11 +43,11 @@ def create_driver():
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
 
-    driver = webdriver.Chrome(
-        ChromeDriverManager().install(),
-        options=options
-    )
+    service = ChromeService(ChromeDriverManager().install())
+
+    driver = webdriver.Chrome(service=service, options=options)
     return driver
+
 
 
 def wait_css(driver, selector, timeout=20):
