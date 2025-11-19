@@ -1,8 +1,9 @@
-name: Performance Lab Auto Book
+name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "30 17 * * *"  # 00:30 WIB
+    # 17:30 UTC = 00:30 WIB
+    - cron: "30 17 * * *"
   workflow_dispatch:
 
 jobs:
@@ -11,7 +12,7 @@ jobs:
 
     services:
       selenium:
-        image: selenium/standalone-chrome:latest
+        image: selenium/standalone-chrome:4.21.0
         ports:
           - 4444:4444
         options: >-
@@ -29,43 +30,48 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install selenium python-dotenv requests
+          pip install -r requirements.txt
 
-      - name: Wait for Selenium to be ready
+      # ===========================================================
+      # FIX #1 — WAIT SELENIUM READY
+      # ===========================================================
+      - name: Wait Selenium Ready
         run: |
-          echo "Waiting selenium..."
+          echo "[SYSTEM] Checking Selenium readiness..."
           for i in {1..20}; do
-            if curl -s http://localhost:4444/wd/hub/status | grep -q '"ready":true'; then
-              echo "Selenium Ready!"
+            STATUS=$(curl -s http://localhost:4444/wd/hub/status || echo "")
+            if echo "$STATUS" | grep -q '"ready":true'; then
+              echo "[SYSTEM] Selenium is ready!"
               exit 0
             fi
-            echo "Retry $i..."
+            echo "[SYSTEM] Retry $i..."
             sleep 2
           done
-          echo "Selenium failed to start" && exit 1
+          echo "[ERROR] Selenium did NOT start"
+          exit 1
 
+      # ===========================================================
+      # FIX #2 — LOG SELALU ADA
+      # ===========================================================
       - name: Run Auto Booking
         id: booking_step
-        env:
-          SELENIUM_URL: http://localhost:4444/wd/hub
-          GYM_CODE: ${{ secrets.GYM_CODE }}
-          GYM_NAME: ${{ secrets.GYM_NAME }}
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          echo "[BOT] Start booking" > booking_log.txt
-          python main.py >> booking_log.txt 2>&1
-          echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
+          echo "[BOT] Starting booking process" > booking_log.txt
+          python main.py >> booking_log.txt 2>&1 || true
+          echo "log_file=booking_log.txt" >> $GITHUB_OUTPUT
 
-      - name: Show main.py output
+      - name: Show log
         if: always()
         run: |
           echo "------ BOOKING LOG START ------"
-          cat booking_log.txt || echo "Log not found!"
+          cat booking_log.txt
           echo "------ BOOKING LOG END ------"
 
+      # ===========================================================
+      # SEND NOTIFICATION
+      # ===========================================================
       - name: Send Discord Notification
-        if: always()
+        run: |
+          python notify.py "${{ steps.booking_step.outputs.log_file }}"
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          python notify.py booking_log.txt
