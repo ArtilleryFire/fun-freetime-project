@@ -155,13 +155,13 @@ def check_reservation(driver):
             booking_code_elem = slot.find_element(By.CLASS_NAME, "booking-code")
             booking_code = booking_code_elem.text.replace("Kode: ", "").strip()
             logger.info(f"Reservation found for {date}: Session {session_id}, Kode: {booking_code}")
-            notify(f">> Reservation found for {date}: Session {session_id} ({booking_code})")
+            notify(f">> Reservation found for {date}: session {session_id} ({booking_code})")
 
 # =============================
 # MAIN
 # =============================
 def main():
-    notify("__*>> Checking for reservation <<*__.")
+    notify("__**>> Checking for reservation <<**__.")
     
     driver = None
     try:
