@@ -4,6 +4,9 @@ import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+
 from notify import send_log   # <<< DISCORD NOTIF
 
 URL = "https://performancelab.my.id"
@@ -15,7 +18,7 @@ GYM_NAME = os.getenv("GYM_NAME")
 PREFERRED_SESSIONS = [6, 5, 4, 3, 2, 1]
 
 MAX_RUNTIME = 300          # 5 menit batas aman runner GA
-MAX_RETRY_LOOP = 5         # <<<<<< BATAS RETRY 5x
+MAX_RETRY_LOOP = 5         # <<<<<< BATAS RETRY
 SLEEP_RETRY = 3            # jeda antara loop retry
 
 
@@ -26,20 +29,22 @@ def log(msg):
     try:
         send_log(full)
     except:
-        pass  # biar tidak ganggu eksekusi utama
+        pass
 
 
+
+#  HEADLESS CHROME LOCAL
 def create_driver():
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
+    options.add_argument("--window-size=1920,1080")
 
-driver = webdriver.Remote(
-    command_executor=os.getenv("SELENIUM_URL", "http://localhost:4444/wd/hub"),
-    options=options
-)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
     return driver
+# ==============================
 
 
 def wait_css(driver, selector, timeout=30):
@@ -115,7 +120,6 @@ def try_booking(driver, session_id):
             log(f"Sesi {session_id} PENUH (text). Skip.")
             return False
 
-        # booking available
         btn.click()
         time.sleep(2)
         log(f"=== BOOKING BERHASIL SESI {session_id} ===")
