@@ -28,7 +28,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-chrome-
 
-
       # Install Chrome only if missing
       - name: Install Chrome
         run: |
@@ -66,6 +65,18 @@ jobs:
           GYM_NAME: ${{ secrets.GYM_NAME }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: python check_reservation.py
+
+      # ✅ NEW STEP → Check for signal flag
+      - name: Check for autobook trigger
+        id: autobook_flag
+        run: |
+          if [ -f "trigger_autobook.flag" ]; then
+            echo "Autobook flag detected!"
+            echo "should_run_autobook=true" >> $GITHUB_OUTPUT
+          else
+            echo "No autobook trigger found."
+            echo "should_run_autobook=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Upload debug files on failure
         if: failure()
