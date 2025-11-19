@@ -1,8 +1,6 @@
 name: Check Sessions Bot
 
 on:
-  schedule:
-    - cron: '0 9 * * *'  # Daily at 9 AM UTC (adjust for your timezone, e.g., '0 2 * * *' for 2 AM UTC)
   workflow_dispatch:  # Manual trigger from GitHub UI
   repository_dispatch:  # Triggered by external events (e.g., Discord via YAGPDB/Zapier)
     types: [discord_trigger]  # Matches the event type sent from your script or external tool
