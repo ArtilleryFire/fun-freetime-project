@@ -1,67 +1,76 @@
-name: Auto Booking Performance Lab
+name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "30 17 * * *"
+    - cron: "0 18 * * *"   # 01:00 WIB (18 UTC)
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   booking:
     runs-on: ubuntu-latest
 
-    services:
-      selenium:
-        image: selenium/standalone-chromium:latest
-        ports:
-          - 4444:4444
-        options: >-
-          --shm-size="2g"
-
     steps:
-
-      - name: Debug Docker
-        run: docker ps -a
-
-      - name: Checkout repo
+      # 1. Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
 
-      - name: Setup Python
+      # 2. Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
+      # 3. Install dependencies
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install selenium
+          pip install requests  # untuk notify.py
 
-      - name: Wait for Selenium
+      # 4. Start Selenium
+      - name: Start Selenium Chrome
         run: |
-          echo "[SYSTEM] Checking Selenium readiness..."
-          for i in {1..30}; do
-            STATUS=$(curl -s http://localhost:4444/wd/hub/status || echo "")
-            if echo "$STATUS" | grep -q '"ready":true'; then
-              echo "[SYSTEM] Selenium is ready!"
-              exit 0
-            fi
-            echo "[SYSTEM] Retry $i..."
-            sleep 2
-          done
-          echo "[ERROR] Selenium did NOT start"
-          exit 1
+          docker run -d --name selenium \
+            -p 4444:4444 \
+            --shm-size="2g" \
+            selenium/standalone-chrome:latest
+          echo "Waiting for Selenium..."
+          sleep 10
 
+      # 5. Run booking script + force logging into file
       - name: Run Auto Booking
-        id: booking_step
+        id: booking
+        env:
+          GYM_CODE: ${{ secrets.GYM_CODE }}
+          GYM_NAME: ${{ secrets.GYM_NAME }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           echo "[BOT] Start booking" > booking_log.txt
-          python main.py >> booking_log.txt 2>&1 || true
+          python3 main.py >> booking_log.txt 2>&1 || true
           echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
 
-      - name: Show log
+      # 6. Show log on GitHub Actions
+      - name: Show booking log
         if: always()
         run: |
+          echo "----- BOOKING LOG START -----"
           cat booking_log.txt
+          echo "----- BOOKING LOG END -----"
 
+      # 7. Send to Discord
       - name: Send Discord Notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          python notify.py "${{ steps.booking_step.outputs.log_path }}"
+          python3 notify.py "${{ steps.booking.outputs.log_path }}"
+
+      # 8. Stop Selenium
+      - name: Stop Selenium
+        if: always()
+        run: |
+          docker stop selenium
+          docker rm selenium
