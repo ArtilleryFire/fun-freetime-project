@@ -85,21 +85,39 @@ def get_sessions(driver, max_retries=20):
 
 def try_booking(driver, session_id):
     try:
-        slot = driver.find_element(By.CSS_SELECTOR, f".session-slot[data-session-id='{session_id}']")
+        slot = driver.find_element(
+            By.CSS_SELECTOR, 
+            f".session-slot[data-session-id='{session_id}']"
+        )
+
+        # ========== CEK STATUS PENUH ==========  
+        classes = slot.get_attribute("class")
+
+        if "full" in classes:
+            log(f"Sesi {session_id} PENUH (detected by class). Skip.")
+            return False
+
+        # tombol
         btn = slot.find_element(By.TAG_NAME, "button")
 
         if not btn.is_enabled():
-            log(f"Sesi {session_id} tidak tersedia.")
+            log(f"Sesi {session_id} TIDAK BISA DIPILIH (button disabled). Skip.")
+            return False
+        
+        text = btn.text.strip().lower()
+        if "penuh" in text or "full" in text:
+            log(f"Sesi {session_id} PENUH (detected by button text). Skip.")
             return False
 
+        # ========== JIKA AVAILABLE ==========  
         btn.click()
         time.sleep(2)
 
         log(f"=== BOOKING BERHASIL: SESI {session_id} ===")
         return True
 
-    except:
-        log(f"Sesi {session_id} tidak ditemukan.")
+    except Exception as e:
+        log(f"Sesi {session_id} tidak ditemukan / error: {e}")
         return False
 
 
