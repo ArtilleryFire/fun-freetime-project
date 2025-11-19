@@ -157,7 +157,7 @@ def perform_booking(driver):
         # Wait for available slots to appear (in case they're loaded dynamically)
         WebDriverWait(driver, TIMEOUT).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".session-slot")))
         slots = driver.find_elements(By.CSS_SELECTOR, ".session-slot.available")
-         if slots:
+        if slots:
             logger.warning("Session Available")
             notify(">> Finding available session.")
             return False
