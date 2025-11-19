@@ -10,10 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      # Install Chrome dependencies (Ubuntu 24.04 compatible)
       - name: Install Chrome dependencies
         run: |
           sudo apt-get update
@@ -35,16 +34,16 @@ jobs:
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt --fix-broken install -y
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Install Python dependencies
+      - name: Install pip dependencies
         run: |
           pip install selenium webdriver-manager requests
 
-      - name: Run Booking Bot
+      - name: Run bot
         env:
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
