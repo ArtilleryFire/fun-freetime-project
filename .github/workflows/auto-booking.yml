@@ -2,7 +2,7 @@ name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "0 18 * * *"   # 01:00 WIB (18 UTC)
+    - cron: "0 18 * * *"   # 01:00 WIB
   workflow_dispatch:
 
 permissions:
@@ -15,9 +15,7 @@ jobs:
     steps:
       # 1. Checkout repo
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
+      uses: actions/checkout@v3
 
       # 2. Setup Python
       - name: Set up Python
@@ -28,47 +26,36 @@ jobs:
       # 3. Install dependencies
       - name: Install dependencies
         run: |
-          pip install selenium
-          pip install requests  # untuk notify.py
+          pip install selenium webdriver-manager
 
-      # 4. Start Selenium
-      - name: Start Selenium Chrome
+      # 4. Start Selenium Standalone Chrome
+      - name: Start Selenium Standalone Chrome
         run: |
           docker run -d --name selenium \
             -p 4444:4444 \
             --shm-size="2g" \
             selenium/standalone-chrome:latest
-          echo "Waiting for Selenium..."
           sleep 10
 
-      # 5. Run booking script + force logging into file
-      - name: Run Auto Booking
-        id: booking
+      # 5. Jalankan Script dengan Logging File
+      - name: Run booking script
         env:
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          echo "[BOT] Start booking" > booking_log.txt
-          python3 main.py >> booking_log.txt 2>&1 || true
-          echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
+          echo "----- BOOKING LOG START -----" | tee booking.log
+          python3 main.py 2>&1 | tee -a booking.log
+          echo "----- BOOKING LOG END -----" | tee -a booking.log
 
-      # 6. Show log on GitHub Actions
-      - name: Show booking log
+      # 6. Upload log sebagai artifact (opsional tapi sangat berguna)
+      - name: Upload booking log
         if: always()
-        run: |
-          echo "----- BOOKING LOG START -----"
-          cat booking_log.txt
-          echo "----- BOOKING LOG END -----"
+        uses: actions/upload-artifact@v3
+        with:
+          name: booking-log
+          path: booking.log
 
-      # 7. Send to Discord
-      - name: Send Discord Notification
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          python3 notify.py "${{ steps.booking.outputs.log_path }}"
-
-      # 8. Stop Selenium
+      # 7. Shutdown Selenium
       - name: Stop Selenium
         if: always()
         run: |
