@@ -132,6 +132,7 @@ def check_reservation(driver):
     debug_capture(driver, "04_dashboard_loaded")
     
     dates = ["today", "tomorrow"]
+    tomorrow_reserved = False
     for date in dates:
         logger.info(f"Checking {date}...")
         try:
@@ -148,6 +149,8 @@ def check_reservation(driver):
         if not reserved_slots:
             logger.info(f"No reservations found for {date}.")
             notify(f">> No reservation for {date}.")
+            if date == "tomorrow":
+                tomorrow_reserved = False
             continue
         
         for slot in reserved_slots:
@@ -156,6 +159,17 @@ def check_reservation(driver):
             booking_code = booking_code_elem.text.replace("Kode: ", "").strip()
             logger.info(f"Reservation found for {date}: Session {session_id}, Kode: {booking_code}")
             notify(f">> Reservation found for {date}: session {session_id} ({booking_code})")
+            if date == "tomorrow":
+                tomorrow_reserved = True
+    
+    # If no reservation for tomorrow, trigger autobook
+    if not tomorrow_reserved:
+        logger.info("No reservation for tomorrow. Triggering autobook.")
+        notify(">> No reservation for tomorrow. Attempting to book...")
+        with open("trigger_autobook.flag", "w") as f:
+            f.write("trigger")
+    else:
+        logger.info("Reservation exists for tomorrow. No autobook needed.")
 
 # =============================
 # MAIN
