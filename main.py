@@ -35,10 +35,10 @@ def create_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
 
-    driver = webdriver.Remote(
-        command_executor=os.getenv("SELENIUM_URL", "http://localhost:4444/wd/hub"),
-        options=options
-    )
+driver = webdriver.Remote(
+    command_executor=os.getenv("SELENIUM_URL", "http://localhost:4444/wd/hub"),
+    options=options
+)
     return driver
 
 
