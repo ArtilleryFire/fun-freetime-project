@@ -1,11 +1,9 @@
 import os
 import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+from selenium.webdriver import Remote
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from notify import send_log  # Discord notifikasi
+from selenium.webdriver.common.by import By
+from notify import send_log
 
 URL = "https://performancelab.my.id"
 DASHBOARD_URL = "https://performancelab.my.id/dashboard.php"
@@ -20,7 +18,6 @@ SLEEP_RETRY = 3
 
 
 def log(msg):
-    """Print ke console + kirim sederhana ke Discord"""
     full = f"[BOT] {msg}"
     print(full, flush=True)
     try:
@@ -30,23 +27,61 @@ def log(msg):
 
 
 def create_driver():
+    """Gunakan Selenium Remote WebDriver (Chrome Container Github Actions)."""
+    log("Menghubungkan ke Selenium Remote Chrome...")
+
     options = Options()
     options.add_argument("--headless=new")
-    options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
+
+    driver = Remote(
+        command_executor="http://localhost:4444/wd/hub",
+        options=options
+    )
     return driver
 
 
-def wait_css(driver, selector, timeout=30):
+def wait_css(driver, selector, timeout=25):
     for _ in range(timeout * 2):
         try:
-            return driver.find_element(By.CSS_SELECTOR, selector)
+            el = driver.find_element(By.CSS_SELECTOR, selector)
+            return el
         except:
             time.sleep(0.5)
     return None
+
+
+def ensure_tomorrow_active(driver):
+    """Klik tombol besok hingga class = active muncul."""
+    for _ in range(6):
+        btn = wait_css(driver, ".date-btn[data-day='tomorrow']", timeout=5)
+        if not btn:
+            time.sleep(1)
+            continue
+
+        btn.click()
+        time.sleep(1.2)
+
+        kelas = btn.get_attribute("class")
+        if "active" in kelas:
+            log("Tombol 'Besok' aktif.")
+            return True
+
+    log("Gagal mengaktifkan tombol besok.")
+    return False
+
+
+def wait_session_grid(driver):
+    """Pastikan grid sesi muncul sebelum melanjutkan."""
+    for _ in range(20):
+        grid = driver.find_elements(By.CSS_SELECTOR, ".session-slot")
+        if grid:
+            return True
+        time.sleep(1)
+    log("Grid sesi tidak muncul.")
+    return False
 
 
 def login(driver):
@@ -56,57 +91,51 @@ def login(driver):
 
     kode = wait_css(driver, "#kode")
     nama = wait_css(driver, "#nama")
+    if not kode or not nama:
+        log("Form login tidak ditemukan.")
+        return False
+
     kode.send_keys(GYM_CODE)
     nama.send_keys(GYM_NAME)
+
     driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
 
-    # Tunggu dashboard.php muncul
-    for i in range(20):
+    for _ in range(20):
         if DASHBOARD_URL in driver.current_url:
-            log("Login berhasil, dashboard terbuka.")
+            log("Login berhasil.")
             return True
         time.sleep(1)
 
-    log("Login gagal atau dashboard tidak terbuka.")
+    log("Login gagal.")
     return False
 
 
-def select_tomorrow(driver):
-    btn = wait_css(driver, ".date-btn[data-day='tomorrow']", timeout=15)
-    if btn:
-        btn.click()
-        time.sleep(2)
-        return True
-    return False
-
-
-def get_sessions(driver, max_retries=25):
-    for attempt in range(max_retries):
-        sessions = driver.find_elements(By.CSS_SELECTOR, ".session-slot.available")
-        if sessions:
-            log(f"Menemukan {len(sessions)} sesi tersedia.")
-            return sessions
-
-        log(f"Sesi belum muncul (retry {attempt+1}/{max_retries})")
-        time.sleep(2)
-        driver.refresh()
-        select_tomorrow(driver)
-    return None
+def get_available_sessions(driver):
+    """Ambil semua sesi dengan class available."""
+    sessions = driver.find_elements(By.CSS_SELECTOR, ".session-slot.available")
+    return sessions
 
 
 def try_booking(driver, session_id):
     try:
-        slot = driver.find_element(
-            By.CSS_SELECTOR,
-            f".session-slot.available[data-session-id='{session_id}']"
-        )
-        btn = slot.find_element(By.TAG_NAME, "button")
+        sel = driver.find_element(By.CSS_SELECTOR,
+            f".session-slot.available[data-session-id='{session_id}']")
+
+        btn = sel.find_element(By.TAG_NAME, "button")
+
         driver.execute_script("arguments[0].scrollIntoView(true);", btn)
-        time.sleep(0.5)
+        time.sleep(0.4)
         driver.execute_script("arguments[0].click();", btn)
         time.sleep(2)
-        log(f"=== BOOKING BERHASIL SESI {session_id} ===")
-        return True
+
+        kelas_baru = sel.get_attribute("class")
+        if "reserved-by-user" in kelas_baru or "unavailable-booked" in kelas_baru:
+            log(f"=== BOOKING BERHASIL SESI {session_id} ===")
+            return True
+
+        log(f"Klik pada sesi {session_id} tidak mengubah status.")
+        return False
+
     except Exception as e:
         log(f"Error sesi {session_id}: {e}")
         return False
@@ -114,47 +143,53 @@ def try_booking(driver, session_id):
 
 def main():
     start = time.time()
-    retry_count = 0
+    retry = 0
+
     log("=== BOT BOOKING DIMULAI ===")
 
     driver = create_driver()
+
     if not login(driver):
         driver.quit()
         return
 
-    time.sleep(1)
-    select_tomorrow(driver)
+    ensure_tomorrow_active(driver)
+    wait_session_grid(driver)
 
-    sessions = get_sessions(driver)
-    if not sessions:
-        log("Gagal mengambil sesi (timeout).")
-        driver.quit()
-        return
-
-    log("Mulai proses booking...")
+    log("Mengambil sesi yang tersedia...")
 
     while True:
         if time.time() - start > MAX_RUNTIME:
-            log("Stop karena runtime > 5 menit.")
+            log("Runtime melebihi batas, stop.")
             driver.quit()
             return
 
-        for session_id in PREFERRED_SESSIONS:
-            log(f"Mencoba sesi {session_id}...")
-            if try_booking(driver, session_id):
+        sessions = get_available_sessions(driver)
+
+        if sessions:
+            log(f"Ditemukan {len(sessions)} sesi available.")
+        else:
+            log("Tidak ada sesi available.")
+
+        for sid in PREFERRED_SESSIONS:
+            log(f"Mencoba booking sesi {sid}...")
+            if try_booking(driver, sid):
                 driver.quit()
                 return
 
-        retry_count += 1
-        if retry_count >= MAX_RETRY_LOOP:
-            log(f"Gagal booking setelah {retry_count} kali retry.")
+        retry += 1
+        if retry >= MAX_RETRY_LOOP:
+            log("Gagal booking, retry habis.")
             driver.quit()
             return
 
-        log(f"Belum dapat sesi, retry {retry_count}/{MAX_RETRY_LOOP} (jeda {SLEEP_RETRY}s)...")
+        log(f"Retry {retry}/{MAX_RETRY_LOOP}, refresh halaman...")
         time.sleep(SLEEP_RETRY)
+
         driver.refresh()
-        select_tomorrow(driver)
+        time.sleep(2)
+        ensure_tomorrow_active(driver)
+        wait_session_grid(driver)
 
 
 if __name__ == "__main__":
