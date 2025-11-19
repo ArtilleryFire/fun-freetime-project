@@ -2,7 +2,7 @@ name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "0 18 * * *"  # 01:00 WIB
+    - cron: "0 18 * * *"   # 01:00 WIB
   workflow_dispatch:
 
 permissions:
@@ -37,7 +37,7 @@ jobs:
             selenium/standalone-chrome:latest
           sleep 10
 
-      # 5. Jalankan Script dengan log file booking_log.txt
+      # 5. Run main.py dengan log full ke console dan ke file
       - name: Run booking script
         env:
           GYM_CODE: ${{ secrets.GYM_CODE }}
