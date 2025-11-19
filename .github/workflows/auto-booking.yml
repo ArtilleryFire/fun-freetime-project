@@ -31,12 +31,12 @@ jobs:
           python main.py > booking_log.txt 2>&1
           echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
           
-- name: Show main.py output
-  if: always()
-  run: |
-    echo "------ BOOKING LOG START ------"
-    cat booking_log.txt || echo "No log file found!"
-    echo "------ BOOKING LOG END ------"
+      - name: Show main.py output
+      if: always()
+      run: |
+        echo "------ BOOKING LOG START ------"
+        cat booking_log.txt || echo "No log file found!"
+        echo "------ BOOKING LOG END ------"
 
       - name: Send Discord Notification
         run: |
