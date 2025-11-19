@@ -1,4 +1,4 @@
-name: Performance Lab Auto Booking
+name: Auto Booking Performance Lab
 
 on:
   schedule:
@@ -12,33 +12,35 @@ jobs:
 
     services:
       selenium:
-        image: selenium/standalone-chrome:4.21.0
+        image: selenium/standalone-chrome:4.25.0   # <<< versi stabil
         ports:
           - 4444:4444
         options: >-
           --shm-size="2g"
 
     steps:
-      - name: Checkout repo
+
+      # 1. Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      # 2. Setup Python
+      - name: Setup Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
+      # 3. Install dependencies
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ===========================================================
-      # FIX #1 — WAIT SELENIUM READY
-      # ===========================================================
-      - name: Wait Selenium Ready
+      # 4. Wait until Selenium is ready
+      - name: Wait for Selenium
         run: |
           echo "[SYSTEM] Checking Selenium readiness..."
-          for i in {1..20}; do
+          for i in {1..25}; do
             STATUS=$(curl -s http://localhost:4444/wd/hub/status || echo "")
             if echo "$STATUS" | grep -q '"ready":true'; then
               echo "[SYSTEM] Selenium is ready!"
@@ -50,28 +52,23 @@ jobs:
           echo "[ERROR] Selenium did NOT start"
           exit 1
 
-      # ===========================================================
-      # FIX #2 — LOG SELALU ADA
-      # ===========================================================
+      # 5. Run main.py + ensure log file always exists
       - name: Run Auto Booking
         id: booking_step
         run: |
-          echo "[BOT] Starting booking process" > booking_log.txt
+          echo "[BOT] Start booking" > booking_log.txt
           python main.py >> booking_log.txt 2>&1 || true
-          echo "log_file=booking_log.txt" >> $GITHUB_OUTPUT
+          echo "log_path=booking_log.txt" >> $GITHUB_OUTPUT
 
-      - name: Show log
+      # 6. Show log on GitHub Actions console
+      - name: Show Log
         if: always()
         run: |
           echo "------ BOOKING LOG START ------"
           cat booking_log.txt
           echo "------ BOOKING LOG END ------"
 
-      # ===========================================================
-      # SEND NOTIFICATION
-      # ===========================================================
+      # 7. Send to Discord
       - name: Send Discord Notification
         run: |
-          python notify.py "${{ steps.booking_step.outputs.log_file }}"
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          python notify.py "${{ steps.booking_step.outputs.log_path }}"
