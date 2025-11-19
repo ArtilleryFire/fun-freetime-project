@@ -2,7 +2,7 @@ name: Performance Lab Auto Booking
 
 on:
   schedule:
-    - cron: "0 18 * * *"   # 01:00 WIB
+    - cron: "0 18 * * *"  # 01:00 WIB
   workflow_dispatch:
 
 permissions:
@@ -13,37 +13,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # 2. Setup Python
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3. Install Python dependencies
-      - name: Install Python dependencies
+      # 3. Install dependencies
+      - name: Install dependencies
         run: |
-          pip install selenium webdriver-manager requests
+          pip install selenium webdriver-manager
 
-      # 4. Jalankan script dengan log file booking_log.txt
+      # 4. Start Selenium Standalone Chrome
+      - name: Start Selenium Standalone Chrome
+        run: |
+          docker run -d --name selenium \
+            -p 4444:4444 \
+            --shm-size="2g" \
+            selenium/standalone-chrome:latest
+          sleep 10
+
+      # 5. Jalankan Script dengan log file booking_log.txt
       - name: Run booking script
         env:
           GYM_CODE: ${{ secrets.GYM_CODE }}
           GYM_NAME: ${{ secrets.GYM_NAME }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          echo "----- BOOKING LOG START -----" > booking_log.txt
-          python3 main.py >> booking_log.txt 2>&1
-          echo "----- BOOKING LOG END -----" >> booking_log.txt
+          echo "----- BOOKING LOG START -----" | tee booking_log.txt
+          python3 main.py 2>&1 | tee -a booking_log.txt
+          echo "----- BOOKING LOG END -----" | tee -a booking_log.txt
 
-      # 5. Upload log sebagai artifact
-      - name: Upload log file
+      # 6. Upload log sebagai artifact
+      - name: Upload booking log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: booking_log.txt
+          name: booking-log
           path: booking_log.txt
+
+      # 7. Shutdown Selenium
+      - name: Stop Selenium
+        if: always()
+        run: |
+          docker stop selenium
+          docker rm selenium
