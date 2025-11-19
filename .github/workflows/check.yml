@@ -3,6 +3,7 @@ name: Check Reservation Bot
 on:
   schedule:
     - cron: '0 8 * * *'  # Daily at 8 AM UTC; adjust as needed (e.g., '0 1 * * *' for 1 AM UTC)
+      workflow_dispatch:  # Manual trigger from GitHub UI
   workflow_run:
     workflows: ["Performance Lab Bot"]  # Trigger after the booking workflow finishes
     types:
