@@ -165,7 +165,6 @@ def check_sessions(driver):
             except Exception as e:
                 logger.warning(f"Could not check {date} session {session_id}: {e}")
                 notify(f">> {date.capitalize()} - Session {session_id}: Unable to check")
-===
 # MAIN
 # =============================
 def main():
