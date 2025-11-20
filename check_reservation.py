@@ -102,28 +102,29 @@ def login(driver):
         membership_elem = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CLASS_NAME, "membership-status")))
         membership_text = membership_elem.text
         logger.info(f"Membership status: {membership_text}")
-        notify(">> Scanning for reservation")
+        notify(f"*{membership_text}*")
         
         # Check for expiry warning
         warning_elem = driver.find_element(By.ID, "membership-warning")
         if warning_elem.is_displayed():
             logger.warning("Membership has expired!")
-            notify(">> Membership has expired!")
+            notify("⚠ Masa aktif membership telah berakhir.")
             return False
         
         logger.info("Login and dashboard verification successful.")
+        notify(">> Login Success")
         return True
     except Exception as e:
         logger.error(f"Login failed: {e}")
         debug_capture(driver, "03_login_failed")
-        notify(">> Unable to login")
+        notify(">> Login Failed, Please Check")
         return False
 
 # =============================
-# Check Reservation Function
+# Check Sessions Function
 # =============================
-def check_reservation(driver):
-    logger.info("Checking reservations for today and tomorrow...")
+def check_sessions(driver):
+    logger.info("Checking sessions for today and tomorrow...")
     
     if DASHBOARD_URL not in driver.current_url:
         driver.get(DASHBOARD_URL)
@@ -132,50 +133,44 @@ def check_reservation(driver):
     debug_capture(driver, "04_dashboard_loaded")
     
     dates = ["today", "tomorrow"]
-    tomorrow_reserved = False
     for date in dates:
         logger.info(f"Checking {date}...")
         try:
             date_btn = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.CSS_SELECTOR, f".date-btn[data-day='{date}']")))
             date_btn.click()
             WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".session-slot")))  # Wait for slots to load
-            debug_capture(driver, f"05_{date}_tab_clicked")
+            debug_capture(f"05_{date}_tab_clicked")
         except Exception as e:
             logger.error(f"Could not click {date} tab: {e}")
+            notify(f">> Could not click {date} tab")
             continue
         
-        # Find reserved slots
-        reserved_slots = driver.find_elements(By.CSS_SELECTOR, ".session-slot.reserved-by-user")
-        if not reserved_slots:
-            logger.info(f"No reservations found for {date}.")
-            notify(f">> No reservation for {date}.")
-            if date == "tomorrow":
-                tomorrow_reserved = False
-            continue
+        notify(f">> Checking {date} session availability...")
         
-        for slot in reserved_slots:
-            session_id = slot.get_attribute("data-session-id")
-            booking_code_elem = slot.find_element(By.CLASS_NAME, "booking-code")
-            booking_code = booking_code_elem.text.replace("Kode: ", "").strip()
-            logger.info(f"Reservation found for {date}: Session {session_id}, Kode: {booking_code}")
-            notify(f">> Reservation found for {date}: session {session_id} ({booking_code})")
-            if date == "tomorrow":
-                tomorrow_reserved = True
-    
-    # If no reservation for tomorrow, trigger autobook
-    if not tomorrow_reserved:
-        logger.info("No reservation for tomorrow. Triggering autobook.")
-        notify(">> No reservation for tomorrow. Attempting to book...")
-        with open("trigger_autobook.flag", "w") as f:
-            f.write("trigger")
-    else:
-        logger.info("Reservation exists for tomorrow. No autobook needed.")
+        for session_id in range(1, 7):  # Sessions 1 to 6
+            try:
+                slot = driver.find_element(By.CSS_SELECTOR, f".session-slot[data-session-id='{session_id}']")
+                quota_elem = slot.find_element(By.CLASS_NAME, "session-quota")
+                quota_text = quota_elem.text  # e.g., "Kuota: 21/30"
+                
+                # Check status: If quota is 30/30, mark as Unavailable; else check for Full or Available
+                if "30/30" in quota_text:
+                    status = "Unavailable"
+                else:
+                    is_full = "full" in slot.get_attribute("class") or "Penuh" in slot.find_element(By.TAG_NAME, "button").text
+                    status = "Full" if is_full else "Available"
+                
+                logger.info(f"{date.capitalize()} - Session {session_id}: {status} ({quota_text})")
+                notify(f">> {date.capitalize()} - Session {session_id}: {status} ({quota_text})")
+            except Exception as e:
+                logger.warning(f"Could not check {date} session {session_id}: {e}")
+                notify(f">> {date.capitalize()} - Session {session_id}: Unable to check")
 
 # =============================
 # MAIN
 # =============================
 def main():
-    notify("__**>> Checking for reservation <<**__.")
+    notify("__**>> Checking Sessions <<**__")
     
     driver = None
     try:
@@ -184,7 +179,8 @@ def main():
             logger.error("Login failed, exiting.")
             return
         
-        check_reservation(driver)
+        check_sessions(driver)
+        notify(">> Session check complete")
     
     except Exception as e:
         logger.error(f"Fatal error: {e}")
