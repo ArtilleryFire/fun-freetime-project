@@ -124,7 +124,7 @@ def login(driver):
 # Check Sessions Function
 # =============================
 def check_sessions(driver):
-    logger.info("Checking sessions for tomorrow...")
+    logger.info("Checking sessions for today and tomorrow...")
     
     if DASHBOARD_URL not in driver.current_url:
         driver.get(DASHBOARD_URL)
@@ -132,34 +132,39 @@ def check_sessions(driver):
     
     debug_capture(driver, "04_dashboard_loaded")
     
-    logger.info("Clicking tomorrow tab...")
-    try:
-        tomorrow_btn = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".date-btn[data-day='tomorrow']")))
-        tomorrow_btn.click()
-        WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".session-slot")))  # Wait for slots to load
-        debug_capture(driver, "05_tomorrow_tab_clicked")
-    except Exception as e:
-        logger.error(f"Could not click tomorrow tab: {e}")
-        notify(">> Could not click tomorrow tab")
-        return
-    
-    notify(">> Checking session availability...")
-    
-    for session_id in range(1, 7):  # Sessions 1 to 6
+    dates = ["today", "tomorrow"]
+    for date in dates:
+        logger.info(f"Checking {date}...")
         try:
-            slot = driver.find_element(By.CSS_SELECTOR, f".session-slot[data-session-id='{session_id}']")
-            quota_elem = slot.find_element(By.CLASS_NAME, "session-quota")
-            quota_text = quota_elem.text  # e.g., "Kuota: 21/30"
-            
-            # Check if full (based on class or button text)
-            is_full = "full" in slot.get_attribute("class") or "Penuh" in slot.find_element(By.TAG_NAME, "button").text
-            status = "Full" if is_full else "Available"
-            
-            logger.info(f"Session {session_id}: {status} ({quota_text})")
-            notify(f">> Session {session_id}: {status} ({quota_text})")
+            date_btn = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.CSS_SELECTOR, f".date-btn[data-day='{date}']")))
+            date_btn.click()
+            WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".session-slot")))  # Wait for slots to load
+            debug_capture(f"05_{date}_tab_clicked")
         except Exception as e:
-            logger.warning(f"Could not check session {session_id}: {e}")
-            notify(f">> Session {session_id}: Unable to check")
+            logger.error(f"Could not click {date} tab: {e}")
+            notify(f">> Could not click {date} tab")
+            continue
+        
+        notify(f">> Checking {date} session availability...")
+        
+        for session_id in range(1, 7):  # Sessions 1 to 6
+            try:
+                slot = driver.find_element(By.CSS_SELECTOR, f".session-slot[data-session-id='{session_id}']")
+                quota_elem = slot.find_element(By.CLASS_NAME, "session-quota")
+                quota_text = quota_elem.text  # e.g., "Kuota: 21/30"
+                
+                # Check status: If quota is 30/30, mark as Unavailable; else check for Full or Available
+                if "30/30" in quota_text:
+                    status = "Unavailable"
+                else:
+                    is_full = "full" in slot.get_attribute("class") or "Penuh" in slot.find_element(By.TAG_NAME, "button").text
+                    status = "Full" if is_full else "Available"
+                
+                logger.info(f"{date.capitalize()} - Session {session_id}: {status} ({quota_text})")
+                notify(f">> {date.capitalize()} - Session {session_id}: {status} ({quota_text})")
+            except Exception as e:
+                logger.warning(f"Could not check {date} session {session_id}: {e}")
+                notify(f">> {date.capitalize()} - Session {session_id}: Unable to check")
 
 # =============================
 # MAIN
