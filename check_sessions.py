@@ -132,7 +132,7 @@ def check_sessions(driver):
     debug_capture(driver, "04_dashboard_loaded")
     
     notify(">> Checking session availability for today...")
-    
+
         for session_id in range(1, 7):  # Sessions 1 to 6
             try:
                 slot = driver.find_element(By.CSS_SELECTOR, f".session-slot[data-session-id='{session_id}']")
@@ -151,7 +151,6 @@ def check_sessions(driver):
             except Exception as e:
                 logger.warning(f"Could not check {date} session {session_id}: {e}")
                 notify(f">> {date.capitalize()} - Session {session_id}: Unable to check")
-
             
     logger.info("Clicking tomorrow tab...")
     try:
@@ -163,7 +162,7 @@ def check_sessions(driver):
         logger.error(f"Could not click tomorrow tab: {e}")
         notify(">> Could not click tomorrow tab")
         return
-
+    notify(">> Checking session availability for tomorrow...")
         for session_id in range(1, 7):  # Sessions 1 to 6
             try:
                 slot = driver.find_element(By.CSS_SELECTOR, f".session-slot[data-session-id='{session_id}']")
