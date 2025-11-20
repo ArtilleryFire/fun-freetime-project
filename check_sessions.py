@@ -139,12 +139,12 @@ def check_sessions(driver):
             date_btn = WebDriverWait(driver, TIMEOUT).until(EC.element_to_be_clickable((By.CSS_SELECTOR, f".date-btn[data-day='{date}']")))
             date_btn.click()
             WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".session-slot")))  # Wait for slots to load
-            debug_capture(f"05_{date}_tab_clicked")
+            debug_capture(driver, f"05_{date}_tab_clicked")
         except Exception as e:
             logger.error(f"Could not click {date} tab: {e}")
             notify(f">> Could not click {date} tab")
             continue
-        
+
         notify(f">> Checking {date} session availability...")
         
         for session_id in range(1, 7):  # Sessions 1 to 6
