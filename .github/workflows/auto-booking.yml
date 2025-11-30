@@ -1,94 +1,73 @@
-// bot.js
-const mineflayer = require('mineflayer')
+name: Performance Lab Bot
 
-const HOST = process.env.MC_HOST || 'alwination.id'
-const PORT = Number(process.env.MC_PORT || 25565)
-const USERNAME = process.env.MC_USERNAME || 'NaftarDD'
-// Ganti sesuai versi server kalau tahu, misal '1.21', '1.20.4', dll
-const VERSION = process.env.MC_VERSION || '1.20.4'
+on:
+  schedule:
+    - cron: '30 17 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [autobook_trigger]  # Triggered by check workflow
 
-// delay reconnect biar nggak kebaca flood / bot attack
-const RETRY_DELAY_MS = Number(process.env.MC_RETRY_DELAY || 15000)
+jobs:
+  reserve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-let bot
-let reconnectTimeout = null
+      # Shared cache for Chrome + apt packages
+      - name: Cache Chrome and apt packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt/archives/*.deb
+            /var/lib/apt/lists/*.gz
+            /var/lib/apt/lists/*_InRelease
+            /var/lib/apt/lists/*_Packages
+          key: ${{ runner.os }}-chrome-cache
+          restore-keys: |
+            ${{ runner.os }}-chrome-
 
-function log(...args) {
-  const time = new Date().toISOString().split('T')[1].replace('Z', '')
-  console.log(`[${time}]`, ...args)
-}
+      # Install Chrome only if not found
+      - name: Install Chrome
+        run: |
+          if ! command -v google-chrome >/dev/null; then
+            echo "Chrome not found. Installing..."
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+            sudo apt-get update
+            sudo apt-get install -y google-chrome-stable
+          else
+            echo "Chrome found in cache. Skipping install."
+          fi
 
-function createBot() {
-  if (reconnectTimeout) {
-    clearTimeout(reconnectTimeout)
-    reconnectTimeout = null
-  }
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-  log('Creating bot...')
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-  bot = mineflayer.createBot({
-    host: HOST,
-    port: PORT,
-    username: USERNAME,
-    version: VERSION,
-    // kalau pakai akun resmi Microsoft:
-    // auth: 'microsoft',
-    // password: '...'
-  })
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium webdriver-manager requests
 
-  // EVENT: berhasil join dunia
-  bot.once('spawn', () => {
-    log('Bot spawned on the server.')
+      - name: Run reservation script
+        env:
+          GYM_CODE: ${{ secrets.GYM_CODE }}
+          GYM_NAME: ${{ secrets.GYM_NAME }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: python main.py
 
-    // Contoh: kirim command otomatis setelah join
-    // (Sesuaikan dengan kebutuhan server kamu)
-    // bot.chat('/register password password')
-    // bot.chat('/login password')
-    // bot.chat('/server survival')
-  })
-
-  // EVENT: chat (kalau ada error parsing, minimal kita lihat raw-nya)
-  bot.on('message', (jsonMsg, position) => {
-    try {
-      // beberapa versi pakai .toAnsi(), beberapa .toString()
-      const msg = jsonMsg.toAnsi ? jsonMsg.toAnsi() : jsonMsg.toString()
-      log('[CHAT]', msg)
-    } catch (err) {
-      log('[CHAT RAW]', JSON.stringify(jsonMsg, null, 2))
-    }
-  })
-
-  // EVENT: error dari mineflayer / koneksi
-  bot.on('error', (err) => {
-    log('Bot error:', err && err.stack ? err.stack : err)
-
-    // Banyak ECONNRESET dari server → biarkan handler 'end' yang urus reconnect
-    if (err.code === 'ECONNRESET') {
-      log('Connection reset by server (ECONNRESET).')
-    }
-  })
-
-  // EVENT: koneksi terputus
-  bot.on('end', () => {
-    log('Bot disconnected from server. Scheduling reconnect...')
-
-    if (!reconnectTimeout) {
-      reconnectTimeout = setTimeout(() => {
-        log(`Reconnecting to ${HOST}:${PORT} as ${USERNAME}...`)
-        createBot()
-      }, RETRY_DELAY_MS)
-    }
-  })
-}
-
-// Handler global biar Node.js nggak langsung mati tanpa log
-process.on('uncaughtException', (err) => {
-  log('Uncaught exception:', err && err.stack ? err.stack : err)
-})
-
-process.on('unhandledRejection', (reason) => {
-  log('Unhandled rejection:', reason)
-})
-
-// Start pertama kali
-createBot()
+      - name: Upload debug files on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-files
+          path: debug/
